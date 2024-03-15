@@ -37,12 +37,12 @@ public:
     ~TabletopImporter();
 
     Error copy_file(const String &p_from, const String &p_to, bool force = false);
-    Error import(const String &p_path);
+    Error import(const String &p_path, Dictionary options);
 
 protected:
     static void _bind_methods();
     static Error _create_import_dir(DirAccess **dir);
-    static Error _import_resource(Ref<ResourceImporter> p_importer, const String &p_path);
+    static Error _import_resource(Ref<ResourceImporter> p_importer, const String &p_path, Dictionary options);
 };
 
 #endif // TABLETOP_IMPORTER_H

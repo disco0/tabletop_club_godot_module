@@ -25,8 +25,9 @@
 		<method name="import">
 			<return type="int" enum="Error" />
 			<argument index="0" name="path" type="String" />
+			<argument index="1" name="options" type="Dictionary" default="{ }" />
 			<description>
-				Import a resource from [code]path[/code].
+				Import a resource from [code]path[/code], with optional [code]options[/code] passed to importer.
 			</description>
 		</method>
 	</methods>

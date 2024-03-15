@@ -44,14 +44,14 @@ TabletopImporter::TabletopImporter() {
         Ref<ResourceImporterScene> scene_importer;
         scene_importer.instance();
         ResourceFormatImporter::get_singleton()->add_importer(scene_importer);
-    
+
         Ref<EditorSceneImporterCollada> collada_importer;
         collada_importer.instance();
         scene_importer->add_importer(collada_importer);
 
-        Ref<EditorSceneImporterGLTF> gltf_importer;
-        gltf_importer.instance();
-        scene_importer->add_importer(gltf_importer);
+        // Ref<EditorSceneImporterGLTF> gltf_importer;
+        // gltf_importer.instance();
+        // scene_importer->add_importer(gltf_importer);
 
         Ref<EditorOBJImporter> obj_importer;
         obj_importer.instance();
@@ -140,7 +140,7 @@ Error TabletopImporter::copy_file(const String &p_from, const String &p_to, bool
     );
 
     memdelete(main_dir);
-    
+
     // Finally, create the .md5 file, and store the hash of the file in it.
     md5_file = FileAccess::open(md5_file_path, FileAccess::WRITE);
     ERR_FAIL_COND_V_MSG(
@@ -157,7 +157,7 @@ Error TabletopImporter::copy_file(const String &p_from, const String &p_to, bool
     return Error::OK;
 }
 
-Error TabletopImporter::import(const String &p_path) {
+Error TabletopImporter::import(const String &p_path, Dictionary options) {
     ERR_FAIL_COND_V_MSG(
         !ResourceFormatImporter::get_singleton()->can_be_imported(p_path),
         Error::ERR_FILE_UNRECOGNIZED,
@@ -165,12 +165,12 @@ Error TabletopImporter::import(const String &p_path) {
     );
 
     Ref<ResourceImporter> importer = ResourceFormatImporter::get_singleton()->get_importer_by_extension(p_path.get_extension());
-    return _import_resource(importer, p_path);
+    return _import_resource(importer, p_path, options);
 }
 
 void TabletopImporter::_bind_methods() {
     ClassDB::bind_method(D_METHOD("copy_file", "from", "to", "force"), &TabletopImporter::copy_file, DEFVAL(false));
-    ClassDB::bind_method(D_METHOD("import", "path"), &TabletopImporter::import);
+    ClassDB::bind_method(D_METHOD("import", "path", "options"), &TabletopImporter::import, DEFVAL(Dictionary()));
 }
 
 Error TabletopImporter::_create_import_dir(DirAccess **dir) {
@@ -194,7 +194,7 @@ Error TabletopImporter::_create_import_dir(DirAccess **dir) {
     return dir_error;
 }
 
-Error TabletopImporter::_import_resource(Ref<ResourceImporter> p_importer, const String &p_path) {
+Error TabletopImporter::_import_resource(Ref<ResourceImporter> p_importer, const String &p_path, Dictionary options) {
 
     ERR_FAIL_COND_V_MSG(
         !FileAccess::exists(p_path),
@@ -204,7 +204,7 @@ Error TabletopImporter::_import_resource(Ref<ResourceImporter> p_importer, const
 
     /**
      * STEP 1: Make sure the directories we want to write to exist.
-     * 
+     *
      * user://.import for the .stex and .md5 files.
      */
     DirAccess *dir;
@@ -218,7 +218,7 @@ Error TabletopImporter::_import_resource(Ref<ResourceImporter> p_importer, const
     /**
      * STEP 2: Use the importer object to create a .stex file in the .import
      * folder.
-     * 
+     *
      * This point onwards is based from the code in:
      * editor/editor_file_system.cpp EditorFileSystem::_reimport_file
      */
@@ -227,16 +227,25 @@ Error TabletopImporter::_import_resource(Ref<ResourceImporter> p_importer, const
     Map<StringName, Variant> params;
 
     List<ResourceImporter::ImportOption> opts;
-    p_importer->get_import_options(&opts);
+    p_importer->get_import_options(&opts, ResourceImporterTexture::PRESET_3D);
 
-    for (List<ResourceImporter::ImportOption>::Element *E = opts.front(); E; E = E->next()) {
-        params[E->get().option.name] = E->get().default_value;
+    for (List<ResourceImporter::ImportOption>::Element *E = opts.front(); E; E = E->next())
+    {
+        String name = E->get().option.name;
+        if (options.has(name))
+        {
+            params[name] = options.get(name, E->get().default_value);
+        }
+        else
+        {
+            params[name] = E->get().default_value;
+        }
     }
 
     // The location where the .stex file will be located.
     String file_import_path = dir->get_current_dir() + "/" + p_path.get_file() + "-" + p_path.md5_text();
     memdelete(dir);
-    
+
     List<String> import_variants;
     Error import_error = p_importer->import(p_path, file_import_path, params, &import_variants);
     ERR_FAIL_COND_V_MSG(
@@ -274,6 +283,12 @@ Error TabletopImporter::_import_resource(Ref<ResourceImporter> p_importer, const
     } else {
         String path = file_import_path + "." + p_importer->get_save_extension();
         file->store_line("path=\"" + path + "\"");
+    }
+
+    // Store params
+    file->store_line("[params]");
+    for (List<ResourceImporter::ImportOption>::Element *E = opts.front(); E; E = E->next()) {
+        file->store_line( E->get().option.name + "=" + params[E->get().option.name] );
     }
 
     file->close();
